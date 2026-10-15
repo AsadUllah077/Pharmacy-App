@@ -1,0 +1,9 @@
+# Access model
+
+Every authenticated business request requires an active user and an authorized active branch. Record services check branch ownership and permission; the Sale policy checks individual invoice access. A warehouse must belong to the transaction branch. Branch selection does not grant permission.
+
+Super Administrator and Pharmacy Owner have all implemented permissions. Branch Manager manages ordinary catalog/inventory/sales/purchases but cannot create users or post finance. Pharmacist can view catalog and inventory and create ordinary sales; prescription dispensing is blocked. Cashier creates sales and reads invoices but cannot discount/refund or access finance. Inventory Manager manages catalog, inventory and receiving. Purchasing Officer creates orders, manages suppliers and receives. Accountant views financial information and posts supplier payments/paid expenses. Auditor and Read-Only Manager have read permissions; see `ReferenceSeeder` for the exact current matrix.
+
+Administration creates users and assigns existing roles and branches, edits account access, and deactivates users. It cannot alter your own access; another administrator is required for that operation. Access changes revoke database sessions. Administrators can create branches with an initial warehouse. Existing role permission arrays are maintained in the database; an interactive custom-role editor, separate warehouse grants, user preferences, optional 2FA and approval segregation remain pending.
+
+Catalog/contact masters are shared across branches. Inventory, purchase, sale, finance, expense and alert data are branch scoped. The dashboard permission includes access to that branch's operational sales/valuation KPIs; assigning dashboard.view is therefore a deliberate grant to those metrics. User administration is organization-wide and restricted to users.manage, granted only to the two top-level seeded roles.
