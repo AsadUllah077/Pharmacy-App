@@ -28,6 +28,7 @@ final class ReturnSale
 
                 return $existing;
             }
+            $due = Money::minor(SaleAccount::summary($sale)['due']);
             $return = SalesReturn::create(['sale_id' => $sale->id, 'user_id' => $user->id, 'request_key' => $data['request_key'], 'reason' => $data['reason'], 'total' => '0.00']);
             $net = $tax = $cost = 0;
             foreach ($data['items'] as $input) {
@@ -48,9 +49,13 @@ final class ReturnSale
                 $tax += $lineTax;
                 $cost += $lineCost;
             }
-            $return->update(['total' => Money::decimal($net + $tax)]);
-            DB::table('refunds')->insert(['sales_return_id' => $return->id, 'amount' => Money::decimal($net + $tax), 'method' => 'cash', 'created_at' => now(), 'updated_at' => now()]);
-            $this->ledger->post($user, $sale->branch_id, 'return:'.$return->id, 'Cash refund; stock quarantined', [['4100', $net, 0], ['2100', $tax, 0], ['1000', 0, $net + $tax], ['1200', $cost, 0], ['5000', 0, $cost]]);
+            $balanceReduction = min($due, $net + $tax);
+            $cashRefund = $net + $tax - $balanceReduction;
+            $return->update(['total' => Money::decimal($net + $tax), 'balance_reduction' => Money::decimal($balanceReduction)]);
+            if ($cashRefund > 0) {
+                DB::table('refunds')->insert(['sales_return_id' => $return->id, 'amount' => Money::decimal($cashRefund), 'method' => 'cash', 'created_at' => now(), 'updated_at' => now()]);
+            }
+            $this->ledger->post($user, $sale->branch_id, 'return:'.$return->id, 'Sale return; balance reduced before cash refund; stock quarantined', [['4100', $net, 0], ['2100', $tax, 0], ['1100', 0, $balanceReduction], ['1000', 0, $cashRefund], ['1200', $cost, 0], ['5000', 0, $cost]]);
             Audit::record($user, $sale->branch_id, 'sale.returned', 'return:'.$return->id);
 
             return $return;

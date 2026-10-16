@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\PaymentRequest;
 use App\Models\MedicineBatch;
 use App\Models\Sale;
+use App\Services\BalanceSheet;
 use App\Services\Expenses;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -35,6 +36,13 @@ class ReportController extends Controller
     public function accountingReport(Request $request, string $report)
     {
         $branch = $request->session()->get('branch_id');
+        if ($report === 'balance-sheet') {
+            $dates = $request->validate(['as_of' => 'nullable|date_format:Y-m-d']);
+            $asOf = $dates['as_of'] ?? now(config('pharmacy.timezone'))->toDateString();
+
+            return Inertia::render('Accounting/BalanceSheet', ['asOf' => $asOf, 'sheet' => app(BalanceSheet::class)->forBranch((int) $branch, $asOf)]);
+        }
+
         if ($report === 'stock-reconciliation') {
             $discrepancies = DB::table('medicine_batches as b')->leftJoin('stock_movements as m', 'm.medicine_batch_id', '=', 'b.id')->where('b.branch_id', $branch)->groupBy('b.id', 'b.lot_number', 'b.quantity', 'b.quarantined_quantity')->select('b.id', 'b.lot_number', 'b.quantity', 'b.quarantined_quantity')->selectRaw('COALESCE(SUM(m.quantity_delta),0) as ledger_quantity, COALESCE(SUM(m.quarantine_delta),0) as ledger_quarantine')->havingRaw('b.quantity <> COALESCE(SUM(m.quantity_delta),0) OR b.quarantined_quantity <> COALESCE(SUM(m.quarantine_delta),0)')->limit(100)->get();
 

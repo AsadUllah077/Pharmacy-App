@@ -30,6 +30,11 @@ class MedicineBatch extends Model
         return $this->belongsTo(Warehouse::class);
     }
 
+    public function receipt()
+    {
+        return $this->belongsTo(GoodsReceipt::class, 'goods_receipt_id');
+    }
+
     public function movements()
     {
         return $this->hasMany(StockMovement::class);

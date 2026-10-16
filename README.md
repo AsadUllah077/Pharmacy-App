@@ -28,10 +28,10 @@ The npm wrapper on this workstation is broken. Replace `npm` with `node 'C:\Prog
 
 - Login/logout, password recovery/change, throttling, active accounts, seeded roles, backend permissions, branch assignments, access revocation and audit records.
 - Catalog create/edit/archive with unique barcode and SKU; supplier/customer management.
-- Purchase orders and partial receiving into batch inventory; separate supplier payments.
-- FEFO checkout with expired/quarantined stock exclusion, row locks, conditional deductions, authoritative integer money calculations, split payments, cash change and idempotent invoice creation.
+- Purchase orders and partial receiving, batch-based purchase returns, supplier credits/refunds, and a dedicated Supplier payments page with order allocations and installments.
+- FEFO checkout with expired/quarantined stock exclusion, row locks, conditional deductions, authoritative integer money calculations, split payments, named-customer partial/unpaid sales, later invoice collections, cash change and idempotent invoice creation.
 - Sales history, printable invoices, partial returns limited to original allocations, cash refunds and quarantine movements.
-- Paid expenses, source-linked balanced journals, trial balance, operating result, stock reconciliation and CSV sales export.
+- Paid expenses, source-linked balanced journals, trial balance, balance sheet with as-of dates, operating result, stock reconciliation and CSV sales export.
 - Real dashboard aggregates, responsive permission-aware navigation, inventory filters, scheduled deduplicated expiry/low-stock alerts and user/branch administration.
 
 ## Verify
@@ -57,6 +57,7 @@ Use the sun/moon button in the top bar or login screen to switch themes. Your ac
 - [Architecture](docs/ARCHITECTURE.md), [plan](docs/PROJECT_PLAN.md), [schema and Mermaid ERD](docs/DATABASE_ERD.md)
 - [Installation, queues, scheduler, deployment, backup and restore](docs/OPERATIONS.md)
 - [POS and purchasing guide](docs/POS_USER_GUIDE.md), [roles and access](docs/ROLES.md)
+- [Partial payments and purchase returns](docs/PAYMENTS_AND_PURCHASE_RETURNS.md)
 - [Accounting assumptions](docs/ACCOUNTING.md), [HTTP interface](docs/API.md)
 - [Implementation status and remaining scope](docs/IMPLEMENTATION_STATUS.md)
 

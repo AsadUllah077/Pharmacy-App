@@ -19,6 +19,7 @@ type CartItem = {
 const form = useForm({
   warehouse_id: branch.value?.warehouses[0]?.id ?? '',
   customer_id: '' as string | number,
+  allow_partial: false,
   request_key: crypto.randomUUID(),
   items: [] as CartItem[],
   payments: [{ method: 'cash', amount: '' }],
@@ -102,6 +103,10 @@ const totals = computed(() =>
     { subtotal: 0, discount: 0, tax: 0, total: 0 },
   ),
 );
+const paidEstimate = computed(() =>
+  form.payments.reduce((sum, p) => sum + Math.round(Number(p.amount || 0) * 100), 0),
+);
+const dueEstimate = computed(() => Math.max(0, totals.value.total - paidEstimate.value) / 100);
 function exact() {
   form.payments = [{ method: 'cash', amount: (totals.value.total / 100).toFixed(2) }];
 }
@@ -110,6 +115,7 @@ function checkout() {
     .transform((data) => ({
       ...data,
       customer_id: data.customer_id || null,
+      payments: data.allow_partial ? data.payments.filter((p) => p.amount !== '') : data.payments,
       items: data.items.map((i) => ({
         medicine_id: i.medicine_id,
         quantity: i.quantity,
@@ -266,6 +272,15 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="payment-section">
+          <label class="check-label"
+            ><input v-model="form.allow_partial" type="checkbox" />Allow partial / unpaid
+            sale</label
+          >
+          <p v-if="form.allow_partial" class="muted">
+            Select a named customer for an unpaid balance. Leave the payment amount blank if nothing
+            is paid now.
+          </p>
+          <p class="notice">Remaining after this payment: {{ money(dueEstimate) }}</p>
           <div class="section-caption">
             <h3>Payment</h3>
             <button class="text-link" @click="exact">Exact cash</button>
@@ -301,7 +316,9 @@ onUnmounted(() => {
           ><button
             class="btn primary checkout-button"
             :disabled="
-              form.processing || !form.items.length || form.payments.some((p) => !p.amount)
+              form.processing ||
+              !form.items.length ||
+              (!form.allow_partial && form.payments.some((p) => !p.amount))
             "
             @click="checkout"
           >

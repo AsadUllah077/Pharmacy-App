@@ -89,8 +89,12 @@ final class Checkout
                     $cash += $amount;
                 }
             }
-            $change = $paid - $total;
-            if ($change < 0 || $change > $cash || $total <= 0) {
+            $outstanding = max(0, $total - $paid);
+            $change = max(0, $paid - $total);
+            if ($outstanding > 0 && (empty($data['allow_partial']) || empty($data['customer_id']))) {
+                throw ValidationException::withMessages(['payments' => 'For partial or unpaid sales, enable partial payment and select a named customer.']);
+            }
+            if ($change > $cash || $total <= 0) {
                 throw ValidationException::withMessages(['payments' => 'Payment must cover the total. Only cash overpayment can be given as change.']);
             }
             $cashChange = $change;
@@ -109,7 +113,7 @@ final class Checkout
                 $paymentLines[] = [Ledger::paymentAccount($payment['method']), $amount, 0];
             }
             $sale->update(['subtotal' => Money::decimal($subtotal), 'discount' => Money::decimal($discount), 'tax' => Money::decimal($tax), 'total' => Money::decimal($total), 'cost' => Money::decimal($cost), 'change' => Money::decimal($change)]);
-            $this->ledger->post($user, $branch, 'sale:'.$sale->id, $sale->invoice_number, array_merge($paymentLines, [['4000', 0, $subtotal - $discount], ['2100', 0, $tax], ['5000', $cost, 0], ['1200', 0, $cost]]));
+            $this->ledger->post($user, $branch, 'sale:'.$sale->id, $sale->invoice_number, array_merge($paymentLines, [['1100', $outstanding, 0], ['4000', 0, $subtotal - $discount], ['2100', 0, $tax], ['5000', $cost, 0], ['1200', 0, $cost]]));
             Audit::record($user, $branch, 'sale.completed', 'sale:'.$sale->id, ['invoice' => $sale->invoice_number]);
 
             return $sale;

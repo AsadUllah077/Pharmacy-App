@@ -71,9 +71,28 @@ export interface SaleItem {
   total: string;
   allocations: Allocation[];
 }
+export interface SalePaymentSummary {
+  paid: string;
+  returned: string;
+  refunded: string;
+  net_total: string;
+  due: string;
+  status: string;
+}
+export interface PurchasePaymentSummary {
+  received: string;
+  returned: string;
+  paid: string;
+  credit_applied: string;
+  supplier_credit_issued: string;
+  supplier_refunds: string;
+  due: string;
+  status: string;
+}
 export interface Sale {
   id: number;
   invoice_number: string;
+  payment_summary: SalePaymentSummary;
   total: string;
   subtotal: string;
   discount: string;
@@ -85,8 +104,8 @@ export interface Sale {
   cashier: Party;
   branch: Branch;
   items: SaleItem[];
-  payments: { id: number; method: string; amount: string }[];
-  returns: { id: number; total: string; reason: string }[];
+  payments: { id: number; method: string; amount: string; created_at: string }[];
+  returns: { id: number; total: string; reason: string; balance_reduction: string }[];
 }
 export interface OrderItem {
   id: number;
@@ -97,6 +116,7 @@ export interface OrderItem {
   medicine: Medicine;
 }
 export interface Order {
+  payment_summary: PurchasePaymentSummary;
   id: number;
   status: string;
   created_at: string;

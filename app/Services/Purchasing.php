@@ -63,6 +63,7 @@ final class Purchasing
             $receipt->update(['total' => Money::decimal($total)]);
             $order->update(['status' => $order->items()->whereColumn('received_quantity', '<', 'quantity')->exists() ? 'partial' : 'received']);
             $this->ledger->post($user, $order->branch_id, 'receipt:'.$receipt->id, 'Goods received; supplier liability', [['1200', $total, 0], ['2000', 0, $total]]);
+            PurchaseAccount::applyCredits($order->branch_id, $order->supplier_id);
             Audit::record($user, $order->branch_id, 'inventory.received', 'receipt:'.$receipt->id);
 
             return $receipt;
@@ -75,21 +76,38 @@ final class Purchasing
 
         return DB::transaction(function () use ($user, $branch, $data) {
             BranchAccess::lock($branch);
+            $hash = hash('sha256', json_encode($data));
             $existing = DB::table('supplier_payments')->where('request_key', $data['request_key'])->first();
             if ($existing) {
-                abort_unless($existing->branch_id === $branch && $existing->user_id === $user->id, 409);
+                abort_unless($existing->branch_id === $branch && $existing->user_id === $user->id && $existing->supplier_id === (int) $data['supplier_id'] && ($existing->request_hash ? hash_equals($existing->request_hash, $hash) : (Money::minor((string) $existing->amount) === Money::minor((string) $data['amount']) && $existing->method === $data['method'])), 409);
 
                 return $existing->id;
             }
-            $billed = DB::table('goods_receipts')->join('purchase_orders', 'purchase_orders.id', '=', 'goods_receipts.purchase_order_id')->where('purchase_orders.branch_id', $branch)->where('purchase_orders.supplier_id', $data['supplier_id'])->sum('goods_receipts.total');
-            $paid = DB::table('supplier_payments')->where('branch_id', $branch)->where('supplier_id', $data['supplier_id'])->sum('amount');
-            $amount = Money::minor((string) $data['amount']);
-            if ($amount > Money::minor((string) $billed) - Money::minor((string) $paid)) {
-                throw ValidationException::withMessages(['amount' => 'Payment exceeds supplier balance.']);
+            PurchaseAccount::applyCredits($branch, (int) $data['supplier_id']);
+            $orders = PurchaseOrder::where('branch_id', $branch)->where('supplier_id', $data['supplier_id'])
+                ->when($data['purchase_order_id'] ?? null, fn ($q, $id) => $q->whereKey($id))->orderBy('id')->get();
+            if (! empty($data['purchase_order_id']) && $orders->isEmpty()) {
+                throw ValidationException::withMessages(['purchase_order_id' => 'Select an order from this supplier and branch.']);
             }
-            $id = DB::table('supplier_payments')->insertGetId(['branch_id' => $branch, 'supplier_id' => $data['supplier_id'], 'user_id' => $user->id, 'amount' => Money::decimal($amount), 'method' => $data['method'], 'request_key' => $data['request_key'], 'created_at' => now(), 'updated_at' => now()]);
+            $amount = Money::minor((string) $data['amount']);
+            $outstanding = $orders->sum(fn ($order) => Money::minor(PurchaseAccount::summary($order->id)['due']));
+            if ($amount <= 0 || $amount > $outstanding) {
+                throw ValidationException::withMessages(['amount' => 'Payment exceeds the remaining purchase balance.']);
+            }
+            $id = DB::table('supplier_payments')->insertGetId(['branch_id' => $branch, 'supplier_id' => $data['supplier_id'], 'user_id' => $user->id, 'amount' => Money::decimal($amount), 'method' => $data['method'], 'request_hash' => $hash, 'request_key' => $data['request_key'], 'created_at' => now(), 'updated_at' => now()]);
+            $remaining = $amount;
+            foreach ($orders as $order) {
+                $allocated = min($remaining, Money::minor(PurchaseAccount::summary($order->id)['due']));
+                if ($allocated > 0) {
+                    DB::table('supplier_payment_allocations')->insert(['supplier_payment_id' => $id, 'purchase_order_id' => $order->id, 'amount' => Money::decimal($allocated)]);
+                    $remaining -= $allocated;
+                }
+                if ($remaining === 0) {
+                    break;
+                }
+            }
             $this->ledger->post($user, $branch, 'supplier-payment:'.$id, 'Supplier payment', [['2000', $amount, 0], [Ledger::paymentAccount($data['method']), 0, $amount]]);
-            Audit::record($user,$branch,'supplier.paid','supplier-payment:'.$id);
+            Audit::record($user, $branch, 'supplier.paid', 'supplier-payment:'.$id);
 
             return $id;
         }, 3);

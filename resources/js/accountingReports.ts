@@ -1,5 +1,10 @@
 export const accountingReports = [
   {
+    title: 'Balance sheet',
+    url: '/accounting/balance-sheet',
+    description: 'Assets, liabilities and equity as of a selected date.',
+  },
+  {
     title: 'Trial balance',
     url: '/accounting/trial-balance',
     description: 'Account debits, credits and balance checks.',

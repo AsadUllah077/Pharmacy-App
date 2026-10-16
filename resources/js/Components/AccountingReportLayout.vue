@@ -9,7 +9,7 @@ defineProps<{ title: string; subtitle: string }>();
     <template #actions
       ><Link href="/accounting" class="btn secondary">Back to accounting</Link></template
     >
-    <nav class="table-toolbar" aria-label="Accounting reports">
+    <nav class="table-toolbar print:hidden" aria-label="Accounting reports">
       <Link
         v-for="report in accountingReports"
         :key="report.url"

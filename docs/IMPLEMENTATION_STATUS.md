@@ -1,5 +1,7 @@
 # Implementation status
 
+**16 October 2026 update:** Dedicated Supplier payments navigation, order-specific/FIFO supplier installments, named-customer partial/unpaid sales and later collections, batch purchase returns, supplier credits/refunds, and receivable-aware customer returns are now implemented. See [current payment/return behavior](PAYMENTS_AND_PURCHASE_RETURNS.md). A separate branch-scoped Balance sheet report is also available, with an as-of date and accumulated earnings. The earlier release notes below describe the original slice; their pending credit-sale/purchase-return items are superseded by this update.
+
 Verified initial integrated release, 15 October 2026. The full request is retained in `docs/REQUIREMENTS.md`. **The complete requested ERP is not finished.** The implemented slice supports receiving → FEFO sale → original-batch return/quarantine → balanced accounting and branch isolation. No placeholder modules are exposed as functioning features.
 
 ## Delivered scope by requested phase

@@ -32,6 +32,8 @@ const { can, money, date } = useBusiness();
               <th>Cashier</th>
               <th>Date</th>
               <th class="number">Total</th>
+              <th class="number">Remaining</th>
+              <th>Payment status</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -42,10 +44,14 @@ const { can, money, date } = useBusiness();
               <td>{{ sale.cashier.name }}</td>
               <td>{{ date(sale.created_at) }}</td>
               <td class="number">{{ money(sale.total) }}</td>
-              <td><Link class="text-link" :href="'/sales/' + sale.id">View / return →</Link></td>
+              <td class="number">{{ money(sale.payment_summary.due) }}</td>
+              <td>{{ sale.payment_summary.status }}</td>
+              <td>
+                <Link class="text-link" :href="'/sales/' + sale.id">View / pay / return →</Link>
+              </td>
             </tr>
             <tr v-if="!sales.data.length">
-              <td colspan="6" class="empty">No sales found.</td>
+              <td colspan="8" class="empty">No sales found.</td>
             </tr>
           </tbody>
         </table>

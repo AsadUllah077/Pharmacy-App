@@ -39,6 +39,8 @@ Route::middleware(['auth', 'branch'])->group(function () {
     Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store');
     Route::get('/purchases/{purchase}', [PurchaseController::class, 'show'])->middleware('permission:purchases.view')->name('purchases.show');
     Route::post('/purchases/{purchase}/receive', [PurchaseController::class, 'receive'])->name('purchases.receive');
+    Route::get('/supplier-payments', [PurchaseController::class, 'payments'])->middleware('permission:accounting.view')->name('supplier-payments.index');
+    Route::post('/purchases/{purchase}/returns', [PurchaseController::class, 'returnGoods'])->name('purchases.returns.store');
     Route::post('/supplier-payments', [PurchaseController::class, 'pay'])->name('supplier-payments.store');
     Route::get('/catalog-search', [PurchaseController::class, 'search'])->middleware('permission:purchases.create')->name('catalog.search');
     Route::get('/pos', [SaleController::class, 'pos'])->middleware('permission:sales.create')->name('pos');
@@ -47,9 +49,10 @@ Route::middleware(['auth', 'branch'])->group(function () {
     Route::post('/checkout', [SaleController::class, 'checkout'])->middleware('throttle:30,1')->name('checkout');
     Route::get('/sales', [SaleController::class, 'index'])->middleware('permission:sales.view')->name('sales.index');
     Route::get('/sales/{sale}', [SaleController::class, 'show'])->middleware('permission:sales.view')->name('sales.show');
+    Route::post('/sales/{sale}/payments', [SaleController::class, 'collectPayment'])->name('sales.payments.store');
     Route::post('/sales/{sale}/returns', [SaleController::class, 'refund'])->name('sales.returns.store');
     Route::get('/accounting', [ReportController::class, 'accounting'])->middleware('permission:accounting.view')->name('accounting.index');
-    Route::get('/accounting/{report}', [ReportController::class, 'accountingReport'])->whereIn('report', ['trial-balance', 'operating-result', 'stock-reconciliation', 'journal-entries'])->middleware('permission:accounting.view')->name('accounting.report');
+    Route::get('/accounting/{report}', [ReportController::class, 'accountingReport'])->whereIn('report', ['trial-balance', 'operating-result', 'stock-reconciliation', 'journal-entries', 'balance-sheet'])->middleware('permission:accounting.view')->name('accounting.report');
     Route::get('/expenses', [ReportController::class, 'expenses'])->middleware('permission:accounting.view')->name('expenses.index');
     Route::post('/expenses', [ReportController::class, 'payExpense'])->name('expenses.store');
     Route::get('/audit', [ReportController::class, 'audit'])->middleware('permission:audit_logs.view')->name('audit.index');

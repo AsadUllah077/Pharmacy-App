@@ -13,6 +13,6 @@ class PaymentRequest extends FormRequest
 
     public function rules(): array
     {
-        return ['request_key' => 'required|uuid', 'amount' => 'required|decimal:0,2|gt:0|max:1000000000', 'method' => 'required|in:cash,bank,card,wallet', 'supplier_id' => ($this->routeIs('supplier-payments.store') ? 'required' : 'nullable').'|integer|exists:suppliers,id', 'category' => ($this->routeIs('expenses.store') ? 'required' : 'nullable').'|string|max:100', 'description' => ($this->routeIs('expenses.store') ? 'required' : 'nullable').'|string|max:200'];
+        return ['purchase_order_id' => 'nullable|integer|exists:purchase_orders,id', 'request_key' => 'required|uuid', 'amount' => 'required|decimal:0,2|gt:0|max:1000000000', 'method' => 'required|in:cash,bank,card,wallet', 'supplier_id' => ($this->routeIs('supplier-payments.store') ? 'required' : 'nullable').'|integer|exists:suppliers,id', 'category' => ($this->routeIs('expenses.store') ? 'required' : 'nullable').'|string|max:100', 'description' => ($this->routeIs('expenses.store') ? 'required' : 'nullable').'|string|max:200'];
     }
 }

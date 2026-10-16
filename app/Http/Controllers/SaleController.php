@@ -4,12 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\CheckoutRequest;
 use App\Http\Requests\ReturnRequest;
+use App\Http\Requests\SalePaymentRequest;
 use App\Models\Customer;
 use App\Models\Medicine;
 use App\Models\Sale;
 use App\Services\BranchAccess;
 use App\Services\Checkout;
 use App\Services\ReturnSale;
+use App\Services\SaleAccount;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
@@ -49,7 +51,7 @@ class SaleController extends Controller
     {
         $q = mb_substr((string) $request->query('q', ''), 0, 100);
 
-        return Inertia::render('Sales', ['sales' => Sale::where('branch_id', $request->session()->get('branch_id'))->when($q, fn ($b) => $b->where('invoice_number', 'like', "%$q%"))->with('customer', 'cashier:id,name')->latest()->paginate(20)->withQueryString(), 'q' => $q]);
+        return Inertia::render('Sales', ['sales' => Sale::where('branch_id', $request->session()->get('branch_id'))->when($q, fn ($b) => $b->where('invoice_number', 'like', "%$q%"))->with('customer', 'cashier:id,name')->latest()->paginate(20)->withQueryString()->through(fn ($sale) => $sale->setAttribute('payment_summary', SaleAccount::summary($sale))), 'q' => $q]);
     }
 
     public function show(Request $request, Sale $sale)
@@ -57,14 +59,23 @@ class SaleController extends Controller
         Gate::authorize('view', $sale);
         abort_unless($sale->branch_id === $request->session()->get('branch_id'), 404);
 
-        return Inertia::render('SaleDetail', ['sale' => $sale->load('items.allocations.batch', 'payments', 'customer', 'cashier:id,name', 'branch', 'returns')]);
+        return Inertia::render('SaleDetail', ['sale' => $sale->load('items.allocations.batch', 'payments', 'customer', 'cashier:id,name', 'branch', 'returns')->setAttribute('payment_summary', SaleAccount::summary($sale))]);
+    }
+
+    public function collectPayment(SalePaymentRequest $request, Sale $sale, SaleAccount $service)
+    {
+        Gate::authorize('view', $sale);
+        abort_unless($sale->branch_id === $request->session()->get('branch_id'), 404);
+        $service->collect($request->user(), $sale, $request->validated());
+
+        return back()->with('success', 'Customer payment received and invoice balance updated.');
     }
 
     public function refund(ReturnRequest $request, Sale $sale, ReturnSale $service)
     {
         abort_unless($sale->branch_id === $request->session()->get('branch_id'), 404);
-        $service->execute($request->user(),$sale,$request->validated());
+        $service->execute($request->user(), $sale, $request->validated());
 
-        return back()->with('success','Cash refund posted. Returned units are quarantined.');
+        return back()->with('success', 'Return posted. Outstanding balance reduced first; any remainder refunded in cash. Returned units are quarantined.');
     }
 }

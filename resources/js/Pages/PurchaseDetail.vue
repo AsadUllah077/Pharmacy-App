@@ -4,9 +4,24 @@ import { Link, useForm } from '@inertiajs/vue3';
 import AppLayout from '../Components/AppLayout.vue';
 import FormErrors from '../Components/FormErrors.vue';
 import { useBusiness } from '../composables';
+import SupplierPaymentForm from '../Components/SupplierPaymentForm.vue';
+import PurchaseReturnForm from '../Components/PurchaseReturnForm.vue';
 import type { Order } from '../types';
-const props = defineProps<{ order: Order }>();
-const { branch, can, money } = useBusiness();
+const props = defineProps<{
+  order: Order;
+  paymentHistory: { id: number; amount: string; method: string; created_at: string }[];
+  purchaseReturns: {
+    id: number;
+    reason: string;
+    total: string;
+    credit_amount: string;
+    refund_amount: string;
+    refund_method: string | null;
+    created_at: string;
+  }[];
+  supplierCredit: string;
+}>();
+const { branch, can, money, date } = useBusiness();
 const pending = computed(() => props.order.items.filter((i) => i.received_quantity < i.quantity));
 const form = useForm({
   warehouse_id: branch.value?.warehouses[0]?.id ?? '',
@@ -51,6 +66,20 @@ function receive() {
     ><template #actions
       ><Link href="/purchases" class="btn secondary">All purchases</Link></template
     >
+    <div class="metric-grid three">
+      <div class="metric-card">
+        <span>Received value</span><strong>{{ money(order.payment_summary.received) }}</strong
+        ><small>Purchase returns: {{ money(order.payment_summary.returned) }}</small>
+      </div>
+      <div class="metric-card">
+        <span>Payments recorded</span><strong>{{ money(order.payment_summary.paid) }}</strong
+        ><small>Supplier credit applied: {{ money(order.payment_summary.credit_applied) }}</small>
+      </div>
+      <div class="metric-card">
+        <span>Remaining to pay</span><strong>{{ money(order.payment_summary.due) }}</strong
+        ><small>{{ order.payment_summary.status }}</small>
+      </div>
+    </div>
     <section class="panel">
       <div class="panel-heading">
         <h2>Ordered items</h2>
@@ -121,6 +150,52 @@ function receive() {
         </p>
       </div>
       <p v-if="!order.receipts.length" class="empty">No stock has been received for this order.</p>
-    </section></AppLayout
-  >
+    </section>
+    <section id="payments" class="panel form-section">
+      <h2>Supplier payment</h2>
+      <p>
+        Supplier: {{ order.supplier.name }}. Available supplier credit: {{ money(supplierCredit) }}.
+      </p>
+      <SupplierPaymentForm
+        v-if="can('accounting.manage') && Number(order.payment_summary.due) > 0"
+        :supplier-id="order.supplier.id"
+        :order-id="order.id"
+        :due="order.payment_summary.due"
+      />
+      <p v-else class="muted">
+        {{
+          Number(order.payment_summary.due) > 0
+            ? 'An accountant can record partial or full payment for this purchase.'
+            : 'No outstanding payment for the goods received so far.'
+        }}
+      </p>
+      <h3>Payment history for this purchase</h3>
+      <p v-for="p in paymentHistory" :key="p.id">
+        SP-{{ p.id }} ? {{ money(p.amount) }} ? {{ p.method }} ? {{ date(p.created_at) }}
+      </p>
+      <p v-if="!paymentHistory.length" class="muted">No payments allocated to this purchase.</p>
+    </section>
+    <section v-if="can('purchases.return') && order.receipts.length" class="panel form-section">
+      <h2>Return goods to supplier</h2>
+      <PurchaseReturnForm
+        :order-id="order.id"
+        :batches="order.receipts.flatMap((r) => r.batches)"
+        :due="order.payment_summary.due"
+      />
+    </section>
+    <section class="panel form-section">
+      <h2>Purchase return history</h2>
+      <div v-for="r in purchaseReturns" :key="r.id" class="receipt-summary">
+        <strong>PR-{{ r.id }} ? {{ money(r.total) }}</strong>
+        <p>{{ r.reason }} ? {{ date(r.created_at) }}</p>
+        <p>
+          Supplier credit issued: {{ money(r.credit_amount) }} ? Refund received:
+          {{ money(r.refund_amount) }} {{ r.refund_method || '' }}
+        </p>
+      </div>
+      <p v-if="!purchaseReturns.length" class="muted">
+        No goods returned to this supplier for this purchase.
+      </p>
+    </section>
+  </AppLayout>
 </template>

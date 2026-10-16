@@ -79,6 +79,12 @@ const navigation = [
   { label: 'Suppliers', url: '/suppliers', permission: 'suppliers.view', icon: ClipboardList },
   { label: 'Sales & returns', url: '/sales', permission: 'sales.view', icon: Receipt },
   { label: 'Customers', url: '/customers', permission: 'customers.view', icon: Users },
+  {
+    label: 'Supplier payments',
+    url: '/supplier-payments',
+    permission: 'accounting.view',
+    icon: Landmark,
+  },
   { label: 'Accounting', url: '/accounting', permission: 'accounting.view', icon: Landmark },
   { label: 'Expenses', url: '/expenses', permission: 'accounting.view', icon: Receipt },
   { label: 'Notifications', url: '/notifications', permission: 'inventory.view', icon: Bell },

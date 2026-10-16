@@ -9,7 +9,7 @@ import MedicinePicker from '../Components/MedicinePicker.vue';
 import { useBusiness } from '../composables';
 import type { Order, Pagination as Paged, Party, Medicine } from '../types';
 defineProps<{ orders: Paged<Order>; suppliers: Party[] }>();
-const { can, date } = useBusiness();
+const { can, date, money } = useBusiness();
 const open = ref(false);
 const form = useForm({
   supplier_id: '',
@@ -23,6 +23,8 @@ function add(m: Medicine) {
 <template>
   <AppLayout title="Purchases" subtitle="Order with clarity. Receive with confidence."
     ><template #actions
+      ><Link v-if="can('accounting.view')" href="/supplier-payments" class="btn secondary"
+        >Supplier payments</Link
       ><button v-if="can('purchases.create')" class="btn primary" @click="open = !open">
         <Plus :size="17" /> New purchase order
       </button></template
@@ -70,6 +72,9 @@ function add(m: Medicine) {
               <th>Supplier</th>
               <th>Created</th>
               <th>Receiving status</th>
+              <th class="number">Paid</th>
+              <th class="number">Remaining</th>
+              <th>Payment status</th>
               <th>Action</th>
             </tr>
           </thead>
@@ -83,12 +88,17 @@ function add(m: Medicine) {
                   order.status
                 }}</span>
               </td>
+              <td class="number">{{ money(order.payment_summary.paid) }}</td>
+              <td class="number">{{ money(order.payment_summary.due) }}</td>
+              <td>{{ order.payment_summary.status }}</td>
               <td>
-                <Link class="text-link" :href="'/purchases/' + order.id">View / receive →</Link>
+                <Link class="text-link" :href="'/purchases/' + order.id"
+                  >View / receive / pay →</Link
+                >
               </td>
             </tr>
             <tr v-if="!orders.data.length">
-              <td colspan="5" class="empty">
+              <td colspan="8" class="empty">
                 No purchase orders yet. Create an order to start receiving stock.
               </td>
             </tr>
