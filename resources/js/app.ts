@@ -4,7 +4,7 @@ import '../css/app.css';
 import '../css/layout.css';
 import { initializeTheme } from './theme';
 initializeTheme();
-const pages = import.meta.glob<{ default: DefineComponent }>('./Pages/*.vue');
+const pages = import.meta.glob<{ default: DefineComponent }>('./Pages/**/*.vue');
 createInertiaApp({
   title: (title) => `${title} · PharmaFlow`,
   resolve: (name) => pages[`./Pages/${name}.vue`]().then((module) => module.default),

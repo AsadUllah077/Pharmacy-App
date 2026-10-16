@@ -65,13 +65,54 @@ class PharmacyHttpTest extends TestCase
         $this->post('/sales/1/returns', ['request_key' => (string) Str::uuid(), 'reason' => 'Condition uncertain', 'items' => [['allocation_id' => $allocation->id, 'quantity' => 1]]])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseHas('refunds', ['amount' => '12.00']);
         $this->assertSame(1, MedicineBatch::first()->quarantined_quantity);
-        $this->get('/accounting')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Accounting')->has('discrepancies', 0));
+        $this->get('/accounting/stock-reconciliation')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Accounting/StockReconciliation')->has('discrepancies', 0));
     }
 
     public function test_all_implemented_screens_render_with_real_props(): void
     {
         foreach (['/', '/medicines', '/inventory', '/suppliers', '/customers', '/purchases', '/pos', '/sales', '/accounting', '/expenses', '/movements', '/notifications', '/audit', '/administration', '/profile'] as $url) {
             $this->get($url)->assertOk();
+        }
+    }
+
+    public function test_accounting_reports_filter_postings_by_branch_and_dates(): void
+    {
+        $otherBranch = Branch::where('code', 'NORTH')->value('id');
+        foreach ([[$this->branch, '2026-10-01', '10.00'], [$this->branch, '2026-09-30', '20.00'], [$otherBranch, '2026-10-01', '30.00']] as [$branch, $date, $amount]) {
+            $entry = DB::table('journal_entries')->insertGetId(['branch_id' => $branch, 'user_id' => $this->admin->id, 'source' => (string) Str::uuid(), 'description' => 'Report filter fixture', 'posting_date' => $date]);
+            foreach ([['1000', $amount, '0.00'], ['4000', '0.00', $amount]] as [$code, $debit, $credit]) {
+                DB::table('journal_lines')->insert(['journal_entry_id' => $entry, 'account_id' => DB::table('accounts')->where('code', $code)->value('id'), 'debit' => $debit, 'credit' => $credit]);
+            }
+        }
+        foreach (['trial-balance' => 'TrialBalance', 'operating-result' => 'OperatingResult'] as $report => $component) {
+            $this->get('/accounting/'.$report.'?from=2026-10-01&to=2026-10-01')->assertOk()->assertInertia(fn (Assert $page) => $page
+                ->component('Accounting/'.$component)->has('balances', 2)
+                ->where('balances.0.debit', fn ($amount) => (float) $amount === 10.0)
+                ->where('balances.1.credit', fn ($amount) => (float) $amount === 10.0)
+                ->where('from', '2026-10-01')->where('to', '2026-10-01'));
+        }
+        $this->get('/accounting/journal-entries?from=2026-10-01&to=2026-10-01')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->component('Accounting/JournalEntries')->has('journals.data', 1)->where('journals.data.0.branch_id', $this->branch));
+        $this->get('/accounting')->assertInertia(fn (Assert $page) => $page->component('Accounting')->missing('balances')->missing('journals')->missing('discrepancies'));
+    }
+
+    public function test_accounting_report_permissions_validation_and_pagination(): void
+    {
+        for ($i = 0; $i < 21; $i++) {
+            DB::table('journal_entries')->insert(['branch_id' => $this->branch, 'user_id' => $this->admin->id, 'source' => 'pagination:'.$i, 'description' => 'Pagination fixture', 'posting_date' => '2026-10-01']);
+        }
+        $this->get('/accounting/journal-entries?from=2026-10-01&page=2')->assertInertia(fn (Assert $page) => $page
+            ->has('journals.data', 1)->where('journals.total', 21)
+            ->where('journals.prev_page_url', fn ($url) => str_contains($url, 'from=2026-10-01')));
+        foreach (['trial-balance', 'operating-result', 'journal-entries'] as $report) {
+            $this->get('/accounting/'.$report.'?from=2026-10-15&to=2026-10-01')->assertSessionHasErrors('to');
+        }
+        $this->get('/accounting/unknown-report')->assertNotFound();
+        $cashier = User::where('email', 'cashier@example.test')->first();
+        foreach (['trial-balance', 'operating-result', 'stock-reconciliation', 'journal-entries'] as $report) {
+            $this->actingAs($cashier)->get('/accounting/'.$report)->assertForbidden();
+            $this->app['auth']->forgetGuards();
+            $this->get('/accounting/'.$report)->assertRedirect('/login');
         }
     }
 
@@ -147,6 +188,6 @@ class PharmacyHttpTest extends TestCase
     public function test_admin_cannot_change_own_access_and_cashier_cannot_administer(): void
     {
         $this->post('/administration/users', ['id' => $this->admin->id, 'name' => $this->admin->name, 'email' => $this->admin->email, 'active' => false, 'role_ids' => [Role::first()->id], 'branch_ids' => [$this->branch]])->assertUnprocessable();
-        $this->actingAs(User::where('email','cashier@example.test')->first())->get('/administration')->assertForbidden();
+        $this->actingAs(User::where('email', 'cashier@example.test')->first())->get('/administration')->assertForbidden();
     }
 }

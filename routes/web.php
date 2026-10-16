@@ -49,6 +49,7 @@ Route::middleware(['auth', 'branch'])->group(function () {
     Route::get('/sales/{sale}', [SaleController::class, 'show'])->middleware('permission:sales.view')->name('sales.show');
     Route::post('/sales/{sale}/returns', [SaleController::class, 'refund'])->name('sales.returns.store');
     Route::get('/accounting', [ReportController::class, 'accounting'])->middleware('permission:accounting.view')->name('accounting.index');
+    Route::get('/accounting/{report}', [ReportController::class, 'accountingReport'])->whereIn('report', ['trial-balance', 'operating-result', 'stock-reconciliation', 'journal-entries'])->middleware('permission:accounting.view')->name('accounting.report');
     Route::get('/expenses', [ReportController::class, 'expenses'])->middleware('permission:accounting.view')->name('expenses.index');
     Route::post('/expenses', [ReportController::class, 'payExpense'])->name('expenses.store');
     Route::get('/audit', [ReportController::class, 'audit'])->middleware('permission:audit_logs.view')->name('audit.index');
@@ -58,5 +59,5 @@ Route::middleware(['auth', 'branch'])->group(function () {
     Route::post('/administration/users', [AdminController::class, 'saveUser'])->middleware('permission:users.manage')->name('users.save');
     Route::post('/administration/branches', [AdminController::class, 'branch'])->middleware('permission:settings.manage')->name('branches.store');
     Route::get('/profile', fn () => Inertia::render('Profile'))->name('profile');
-    Route::put('/profile/password',[AuthController::class, 'change'])->name('profile.password');
+    Route::put('/profile/password', [AuthController::class, 'change'])->name('profile.password');
 });

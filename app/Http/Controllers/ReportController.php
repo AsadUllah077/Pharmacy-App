@@ -27,14 +27,34 @@ class ReportController extends Controller
         return Inertia::render('Dashboard', ['stats' => $stats, 'days' => $days, 'recent' => Sale::where('branch_id', $branch)->latest()->limit(6)->get(['id', 'invoice_number', 'total', 'created_at']), 'alerts' => DB::table('operational_alerts')->where('branch_id', $branch)->where('resolved', false)->latest()->limit(5)->get()]);
     }
 
-    public function accounting(Request $request)
+    public function accounting()
+    {
+        return Inertia::render('Accounting');
+    }
+
+    public function accountingReport(Request $request, string $report)
     {
         $branch = $request->session()->get('branch_id');
-        $dates = $request->validate(['from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d|after_or_equal:from']);
-        $balances = DB::table('journal_lines')->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')->join('accounts', 'accounts.id', '=', 'journal_lines.account_id')->where('journal_entries.branch_id', $branch)->when($dates['from'] ?? null, fn ($q, $v) => $q->where('posting_date', '>=', $v))->when($dates['to'] ?? null, fn ($q, $v) => $q->where('posting_date', '<=', $v))->groupBy('accounts.id', 'accounts.code', 'accounts.name', 'accounts.type')->select('accounts.code', 'accounts.name', 'accounts.type')->selectRaw('SUM(debit) as debit, SUM(credit) as credit')->orderBy('accounts.code')->get();
-        $discrepancies = DB::table('medicine_batches as b')->leftJoin('stock_movements as m', 'm.medicine_batch_id', '=', 'b.id')->where('b.branch_id', $branch)->groupBy('b.id', 'b.lot_number', 'b.quantity', 'b.quarantined_quantity')->select('b.id', 'b.lot_number', 'b.quantity', 'b.quarantined_quantity')->selectRaw('COALESCE(SUM(m.quantity_delta),0) as ledger_quantity, COALESCE(SUM(m.quarantine_delta),0) as ledger_quarantine')->havingRaw('b.quantity <> COALESCE(SUM(m.quantity_delta),0) OR b.quarantined_quantity <> COALESCE(SUM(m.quarantine_delta),0)')->limit(100)->get();
+        if ($report === 'stock-reconciliation') {
+            $discrepancies = DB::table('medicine_batches as b')->leftJoin('stock_movements as m', 'm.medicine_batch_id', '=', 'b.id')->where('b.branch_id', $branch)->groupBy('b.id', 'b.lot_number', 'b.quantity', 'b.quarantined_quantity')->select('b.id', 'b.lot_number', 'b.quantity', 'b.quarantined_quantity')->selectRaw('COALESCE(SUM(m.quantity_delta),0) as ledger_quantity, COALESCE(SUM(m.quarantine_delta),0) as ledger_quarantine')->havingRaw('b.quantity <> COALESCE(SUM(m.quantity_delta),0) OR b.quarantined_quantity <> COALESCE(SUM(m.quarantine_delta),0)')->limit(100)->get();
 
-        return Inertia::render('Accounting', ['balances' => $balances, 'discrepancies' => $discrepancies, 'journals' => DB::table('journal_entries')->where('branch_id', $branch)->latest()->paginate(20), 'from' => $dates['from'] ?? '', 'to' => $dates['to'] ?? '']);
+            return Inertia::render('Accounting/StockReconciliation', ['discrepancies' => $discrepancies]);
+        }
+
+        $dates = $request->validate(['from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d|after_or_equal:from']);
+        $filters = ['from' => $dates['from'] ?? '', 'to' => $dates['to'] ?? ''];
+        if ($report === 'journal-entries') {
+            $journals = DB::table('journal_entries')->where('branch_id', $branch)
+                ->when($filters['from'], fn ($q, $v) => $q->where('posting_date', '>=', $v))
+                ->when($filters['to'], fn ($q, $v) => $q->where('posting_date', '<=', $v))
+                ->orderByDesc('posting_date')->orderByDesc('id')->paginate(20)->withQueryString();
+
+            return Inertia::render('Accounting/JournalEntries', [...$filters, 'journals' => $journals]);
+        }
+
+        $balances = DB::table('journal_lines')->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')->join('accounts', 'accounts.id', '=', 'journal_lines.account_id')->where('journal_entries.branch_id', $branch)->when($dates['from'] ?? null, fn ($q, $v) => $q->where('posting_date', '>=', $v))->when($dates['to'] ?? null, fn ($q, $v) => $q->where('posting_date', '<=', $v))->groupBy('accounts.id', 'accounts.code', 'accounts.name', 'accounts.type')->select('accounts.code', 'accounts.name', 'accounts.type')->selectRaw('SUM(debit) as debit, SUM(credit) as credit')->orderBy('accounts.code')->get();
+
+        return Inertia::render($report === 'trial-balance' ? 'Accounting/TrialBalance' : 'Accounting/OperatingResult', [...$filters, 'balances' => $balances]);
     }
 
     public function expenses(Request $request)
